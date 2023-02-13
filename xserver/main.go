@@ -10,8 +10,9 @@ import (
 )
 
 func main() {
+	log.SetLevel(log.TraceLevel)
 	// At first, create a TLS server
-	// To do so, we need certs
+	// To do so, we need certs: openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3650 -nodes
 	cer, err := tls.LoadX509KeyPair(os.Getenv("CERT"), os.Getenv("KEY"))
 	if err != nil {
 		log.WithError(err).Fatalln("cannot load cert and key")
@@ -24,6 +25,7 @@ func main() {
 		return
 	}
 	defer ln.Close()
+	log.Info("Listening on ", ln.Addr())
 	// Now wait for connections
 	for {
 		conn, err := ln.Accept()
@@ -37,14 +39,15 @@ func main() {
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	// 8kb buffer. More than MTU.
-	var buffer [8 * 1024]byte
+	// Very small buffer for address only
+	var buffer [1024]byte
 	// We know that the first packet is the destination address
 	n, err := conn.Read(buffer[:])
 	if err != nil {
 		log.WithError(err).WithField("remote", conn.RemoteAddr()).Error("cannot read the first packet")
 		return
 	}
+	log.Debug("dialing ", string(buffer[:n]))
 	// Dial the udp destination
 	proxy, err := net.Dial("udp", string(buffer[:n]))
 	if err != nil {
