@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import asyncudp
 import asyncio
 import ssl
@@ -55,12 +56,18 @@ async def handle_connection(server_reader: asyncio.StreamReader, server_writer: 
 
 
 async def setup_server():
+    # Load config
+    with open('xserver_conf.json') as config_file:
+        config = json.load(config_file)
+        listen_address = config["listen_address"]
+        listen_port = config["listen_port"]
+    # Setup TLS and listen
     ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_ctx.load_cert_chain('cert.pem', keyfile='key.pem')
     ssl_ctx.check_hostname = False
     server = await asyncio.start_server(handle_connection,
-                                     '127.0.0.1',
-                                     44443,
+                                     listen_address,
+                                     listen_port,
                                      ssl=ssl_ctx)
     print('Serving on {}'.format(server.sockets[0].getsockname()))
     async with server:

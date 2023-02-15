@@ -1,74 +1,77 @@
-#!/usr/bin/env python3
-
 import asyncio
 import ssl
+import json
 
-def addr_to_string(addr: tuple[str, int]) -> int:
-    return addr[0] + ":" + str(addr[1])
+
+xserver_ip = None
+xserver_port = None
+client_port  = None
+server_port  = None
+
+
+conn_list = {}
 
 class EchoServerProtocol:
-    def __init__(self) -> None:
-        self._address_map = {}
-        self._address_map_lock = asyncio.Lock()
+    async def read_from_server(self,reader,addr):
+        while True:
+            data = await reader.read(1024)
+            if not data :
+                break
+            response = data.decode()
+            print(f'Received response: {response}')
+            self.transport.sendto(data, addr)
+
+    async def send_to_server(self,message,addr):
+        if addr not in conn_list :
+            ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.VerifyMode.CERT_NONE
+            reader, writer = await asyncio.open_connection(xserver_ip, xserver_port,ssl= ssl_ctx)
+            conn_list[addr] = (reader,writer)
+            first_adr = f'127.0.0.1:{server_port}'
+            writer.write(first_adr.encode())
+            await writer.drain()
+            await reader.read(1024) 
+            loop = asyncio.get_event_loop()
+            loop.create_task(self.read_from_server(reader,addr))
+        reader, writer = conn_list[addr]
+        writer.write(message)
+        await writer.drain()
+        
 
     def connection_made(self, transport):
         self.transport = transport
 
     def datagram_received(self, data, addr):
         loop = asyncio.get_event_loop()
-        loop.create_task(self.handle_datagram(data, addr))
+        loop.create_task(self.send_to_server(data,addr))
+    
 
-    async def handle_datagram(self, data: bytes, addr: tuple[str, int]):
-        async with self._address_map_lock:
-            if addr_to_string(addr) not in self._address_map:
-                # Create a TLS connection to server
-                ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-                ssl_ctx.check_hostname = False
-                ssl_ctx.verify_mode = ssl.VerifyMode.CERT_NONE
-                reader, writer = await asyncio.open_connection('127.0.0.1', 44443, ssl=ssl_ctx)
-                # Send handshake
-                writer.write(b'127.0.0.1:12345')
-                await writer.drain()
-                ack_packet = await reader.read(3)
-                if ack_packet.decode() != "ack":
-                    raise Exception("invalid ack packet")
-                # Setup the reader
-                asyncio.create_task(self.read_from_tls(reader, addr))
-                # Save it to map
-                self._address_map[addr_to_string(addr)] = writer
 
-        # Now we are sure that a TLS connection exists in the hashmap
-        writer: asyncio.StreamWriter = self._address_map[addr_to_string(addr)]
-        writer.write(data)
-        await writer.drain()
+async def main():
+    with open("./xclient_conf.json") as json_file: 
+        obj = json.load(json_file)
+        global xserver_port 
+        xserver_port = obj["xserver_port"]
+        global xserver_ip
+        xserver_ip = obj["server_ip"]
+        global client_port 
+        client_port = obj["client_port"]
+        global server_port 
+        server_port = obj["server_port"]
+        
 
-    async def read_from_tls(self, tls_reader: asyncio.StreamReader, addr: tuple[str, int]):
-        try:
-            while True:
-                data = await tls_reader.read(1500) # MTU
-                if not data:
-                    break
-                self.transport.sendto(data, addr) # Send to socket
-        except:
-            pass
-        # Close the tls
-        async with self._address_map_lock:
-            if addr_to_string(addr) not in self._address_map:
-                self._address_map[addr_to_string(addr)].close()
-                await self._address_map[addr_to_string(addr)].wait_closed()
-                del self._address_map[addr_to_string(addr)]
-                
-
-async def setup_server():
     loop = asyncio.get_running_loop()
-    address = ('127.0.0.1', 9999)
     await loop.create_datagram_endpoint(
         lambda: EchoServerProtocol(),
-        local_addr=address)
-    print("Started the UDP server on {}".format(address))
-    # Never exit the app
+        local_addr=('127.0.0.1', client_port)
+    )
     while True:
         await asyncio.sleep(3600)
 
+
+
+
+
 if __name__ == '__main__':
-    asyncio.run(setup_server())
+    asyncio.run(main())
