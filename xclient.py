@@ -6,7 +6,7 @@ import json
 xserver_ip = None
 xserver_port = None
 client_port  = None
-server_port  = None
+forward_address  = None
 
 
 conn_list = {}
@@ -28,8 +28,7 @@ class EchoServerProtocol:
             ssl_ctx.verify_mode = ssl.VerifyMode.CERT_NONE
             reader, writer = await asyncio.open_connection(xserver_ip, xserver_port,ssl= ssl_ctx)
             conn_list[addr] = (reader,writer)
-            first_adr = f'127.0.0.1:{server_port}'
-            writer.write(first_adr.encode())
+            writer.write(forward_address.encode())
             await writer.drain()
             await reader.read(1024) 
             loop = asyncio.get_event_loop()
@@ -54,11 +53,11 @@ async def main():
         global xserver_port 
         xserver_port = obj["xserver_port"]
         global xserver_ip
-        xserver_ip = obj["server_ip"]
+        xserver_ip = obj["xserver_ip"]
         global client_port 
         client_port = obj["client_port"]
-        global server_port 
-        server_port = obj["server_port"]
+        global forward_address 
+        forward_address = obj["forward_address"]
         
 
     loop = asyncio.get_running_loop()

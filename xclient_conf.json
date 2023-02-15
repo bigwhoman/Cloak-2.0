@@ -1,6 +1,6 @@
 {
    "xserver_port" : 44443,
-   "client_port" : 12345,
-   "server_port" : 4567,
-   "server_ip": "127.0.0.1"
+   "xserver_ip": "127.0.0.1",
+   "client_port" : 54321,
+   "forward_address" : "127.0.0.1:12345"
 }
