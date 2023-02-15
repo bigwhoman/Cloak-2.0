@@ -17,7 +17,7 @@ async def copy_to_udp(tcp_reader: asyncio.StreamReader, udp_writer: asyncudp.Soc
             if not data: # done!
                 break
             udp_writer.sendto(data)
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0) # Task.Yield()
         except:
             break # fuck up
     udp_writer.close()

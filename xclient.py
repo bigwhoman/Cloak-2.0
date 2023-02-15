@@ -15,10 +15,8 @@ class EchoServerProtocol:
         self.transport = transport
 
     def datagram_received(self, data, addr):
-        print(type(data))
-        #print('Received %r from %s' % (message, addr))
-        #print('Send %r to %s' % (message, addr))
-        self.transport.sendto(data, addr)
+        loop = asyncio.get_event_loop()
+        loop.create_task(self.handle_datagram(data, addr))
 
     async def handle_datagram(self, data: bytes, addr: tuple[str, int]):
         async with self._address_map_lock:
@@ -29,7 +27,7 @@ class EchoServerProtocol:
                 ssl_ctx.verify_mode = ssl.VerifyMode.CERT_NONE
                 reader, writer = await asyncio.open_connection('127.0.0.1', 44443, ssl=ssl_ctx)
                 # Send handshake
-                writer.write(addr_to_string(addr).encode())
+                writer.write(b'127.0.0.1:12345')
                 await writer.drain()
                 ack_packet = await reader.read(3)
                 if ack_packet.decode() != "ack":
@@ -63,10 +61,11 @@ class EchoServerProtocol:
 
 async def setup_server():
     loop = asyncio.get_running_loop()
+    address = ('127.0.0.1', 9999)
     await loop.create_datagram_endpoint(
         lambda: EchoServerProtocol(),
-        local_addr=('127.0.0.1', 9999))
-    print("Started the UDP server")
+        local_addr=address)
+    print("Started the UDP server on {}".format(address))
     # Never exit the app
     while True:
         await asyncio.sleep(3600)
