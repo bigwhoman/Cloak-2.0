@@ -1,11 +1,13 @@
 import asyncio
 import ssl
+import json
 
 
 server_ip = 'localhost'
-xserver_port = 44443
-client_port = 12345
-server_port = 4567
+
+xserver_port = None
+client_port  = None
+server_port  = None
 
 
 conn_list = {}
@@ -48,6 +50,15 @@ class EchoServerProtocol:
 
 
 async def main():
+    with open("./xclient_conf.json") as json_file: 
+        obj = json.load(json_file)
+        global xserver_port 
+        xserver_port = obj["xserver_port"]
+        global client_port 
+        client_port = obj["client_port"]
+        global server_port 
+        server_port = obj["server_port"]
+
     loop = asyncio.get_running_loop()
     transport, protocol = await loop.create_datagram_endpoint(
         lambda: EchoServerProtocol(),
