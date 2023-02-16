@@ -11,18 +11,17 @@ forward_address  = None
 
 conn_list = {}
 
-class EchoServerProtocol:
+class XClientServerProtocol:
     async def read_from_server(self,reader,addr):
         while True:
-            data = await reader.read(1024)
+            data = await reader.read(1500) # MTU
             if not data :
                 break
-            response = data.decode()
-            print(f'Received response: {response}')
             self.transport.sendto(data, addr)
 
     async def send_to_server(self,message,addr):
         if addr not in conn_list :
+            print("Creating new TLS connection for {}".format(addr))
             ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             ssl_ctx.check_hostname = False
             ssl_ctx.verify_mode = ssl.VerifyMode.CERT_NONE
@@ -62,9 +61,10 @@ async def main():
 
     loop = asyncio.get_running_loop()
     await loop.create_datagram_endpoint(
-        lambda: EchoServerProtocol(),
+        lambda: XClientServerProtocol(),
         local_addr=('127.0.0.1', client_port)
     )
+    print(f"Listening on 127.0.0.1:{client_port}")
     while True:
         await asyncio.sleep(3600)
 
